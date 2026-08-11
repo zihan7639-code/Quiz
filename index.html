@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,7 +48,7 @@
     #matrix {
       position: fixed;
       inset: 0;
-      opacity: 0.12;
+      opacity: 0.15;
       z-index: 0;
     }
 
@@ -144,6 +145,13 @@
       20%, 60% { transform: translateX(-8px); background-color: rgba(255,51,51,0.3); border-color: #ff3333; }
       40%, 80% { transform: translateX(8px); background-color: rgba(255,51,51,0.3); border-color: #ff3333; }
     }
+
+    .btn-active-mode {
+      background-color: #00ff41 !important;
+      color: #000000 !important;
+      border-color: #00ff41 !important;
+      box-shadow: 0 0 12px #00ff41;
+    }
   </style>
 </head>
 <body class="scanlines">
@@ -173,6 +181,35 @@
         <button id="subBtn" class="cyber-btn" onclick="handleSubscribe()">
           [ SUBSCRIBE TO UNLOCK ]<span class="blink">_</span>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAME PROMPT MODAL -->
+  <div id="name-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="wide-design max-w-md w-full p-6 rounded-2xl border border-green-500 shadow-[0_0_30px_rgba(0,255,65,0.2)] text-center space-y-4">
+      <div class="text-3xl">👤</div>
+      <h3 class="font-[Orbitron] text-xl font-bold tracking-wider text-green-400">ENTER YOUR NAME</h3>
+      <p class="text-xs text-gray-400 font-mono">Please enter your name to start playing this quiz!</p>
+      <input id="player-name-input" type="text" maxlength="20" placeholder="Your Name..." class="w-full bg-black border border-white/30 rounded-xl p-3 text-white focus:outline-none focus:border-green-400 text-center font-bold tracking-wider" />
+      <button onclick="confirmPlayerName()" class="w-full bg-green-500 text-black font-black py-3 rounded-xl hover:bg-green-400 transition font-mono uppercase">
+        Done
+      </button>
+    </div>
+  </div>
+
+  <!-- OWNER LEADERBOARD MODAL (🥸) -->
+  <div id="leaderboard-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="wide-design max-w-2xl w-full p-6 rounded-2xl border border-green-500 shadow-[0_0_30px_rgba(0,255,65,0.3)] space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-white/10 pb-3">
+        <h3 class="font-[Orbitron] text-lg font-bold text-green-400 flex items-center gap-2">
+          🥸 OWNER ANALYTICS & RESPONSES
+        </h3>
+        <button onclick="closeLeaderboard()" class="text-gray-400 hover:text-white font-mono text-xl">✕</button>
+      </div>
+      
+      <div id="leaderboard-content" class="overflow-y-auto space-y-3 pr-2 flex-1 font-mono text-sm">
+        <!-- Results rendered dynamically -->
       </div>
     </div>
   </div>
@@ -230,10 +267,11 @@
           <input id="q-img-input" type="file" accept="image/*" class="hidden" onchange="previewImage(event)" />
         </div>
 
-        <!-- Options Container -->
-        <div class="space-y-4">
+        <!-- Dynamic Question Mode Sections -->
+        <!-- 1. Multiple Choice & Poll Options Container -->
+        <div id="mcq-options-wrapper" class="space-y-4">
           <div class="flex justify-between items-center">
-            <label class="text-xs tracking-wider text-gray-400 uppercase font-mono">Answer Options (Click ● to mark Correct Answer)</label>
+            <label id="options-label-text" class="text-xs tracking-wider text-gray-400 uppercase font-mono">Answer Options (Click ● to mark Correct Answer)</label>
             <span class="text-xs font-mono text-gray-400"><span id="opt-count">3</span>/7 Options</span>
           </div>
           <div id="options-list" class="space-y-3">
@@ -244,18 +282,34 @@
           </button>
         </div>
 
-        <!-- Action Controls (Next Q & Finish) -->
-        <div class="flex justify-between items-center pt-6 border-t border-white/10">
+        <!-- 2. Text Answer Input Container (🧩 Mode) -->
+        <div id="text-ans-wrapper" class="hidden space-y-2">
+          <label class="text-xs tracking-wider text-green-400 uppercase font-mono font-bold">Put Correct Answer</label>
+          <input id="text-correct-ans-input" type="text" placeholder="Type correct answer here (e.g. hi)..." class="w-full bg-black/60 border border-green-500 rounded-xl p-3 text-white focus:outline-none focus:ring-1 focus:ring-green-400 transition font-mono" />
+        </div>
+
+        <!-- Action Controls (Mode Toggles, Next Q & Finish) -->
+        <div class="flex flex-wrap justify-between items-center gap-4 pt-6 border-t border-white/10">
           <span class="text-xs text-gray-400 font-mono">Total Questions Added: <strong id="total-q-count" class="text-white">0</strong></span>
           
-          <div class="flex gap-4">
+          <div class="flex items-center gap-3">
+            <!-- Mode Toggle 1: 🎭 Poll Mode -->
+            <button id="btn-poll-mode" onclick="togglePollMode()" class="bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold p-3 rounded-xl transition text-xl flex items-center justify-center w-12 h-12" title="Toggle Voting Poll Question">
+              🎭
+            </button>
+
+            <!-- Mode Toggle 2: 🧩 Text Answer Mode -->
+            <button id="btn-text-mode" onclick="toggleTextMode()" class="bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold p-3 rounded-xl transition text-xl flex items-center justify-center w-12 h-12" title="Toggle Text Answer Question">
+              🧩
+            </button>
+
             <!-- 1. Next Question button -->
-            <button onclick="saveAndNextQuestion()" class="bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold py-3 px-6 rounded-xl transition text-xl flex items-center gap-2" title="Save Question & Add Next">
+            <button onclick="saveAndNextQuestion()" class="bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold p-3 px-5 rounded-xl transition text-xl flex items-center gap-2" title="Save Question & Add Next">
               <span>≫</span>
             </button>
             
             <!-- 2. Finish Quiz button -->
-            <button onclick="finishAndPublishQuiz()" class="bg-green-500 hover:bg-green-400 text-black font-black py-3 px-6 rounded-xl transition text-xl flex items-center gap-2" title="Publish Quiz & Get 11-Char Code">
+            <button onclick="finishAndPublishQuiz()" class="bg-green-500 hover:bg-green-400 text-black font-black p-3 px-5 rounded-xl transition text-xl flex items-center gap-2" title="Publish Quiz & Get 11-Char Code">
               <span>✅</span>
             </button>
           </div>
@@ -281,7 +335,13 @@
       <!-- VIEW 4: Take Quiz Player -->
       <div id="view-play" class="hidden space-y-6">
         <div class="flex justify-between items-center border-b border-white/10 pb-4">
-          <span class="text-xs font-mono text-gray-400">QUESTION <span id="play-q-index">1</span> OF <span id="play-q-total">1</span></span>
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-mono text-gray-400">QUESTION <span id="play-q-index">1</span> OF <span id="play-q-total">1</span></span>
+            <!-- Owner Leaderboard Icon (🥸) -->
+            <button id="owner-btn" onclick="openLeaderboard()" class="hidden bg-green-500/20 border border-green-500 hover:bg-green-500/40 text-white px-2 py-1 rounded-lg text-lg transition" title="View Responses (Owner Only)">
+              🥸
+            </button>
+          </div>
           <button onclick="goHome()" class="text-xs text-red-400 hover:underline">Quit</button>
         </div>
 
@@ -293,9 +353,15 @@
           <img id="play-q-img" src="" class="max-h-64 object-contain" />
         </div>
 
-        <!-- Options Buttons -->
+        <!-- Question Input Container (MCQ / Poll or Text) -->
         <div id="play-options-container" class="space-y-3 pt-2">
-          <!-- Dynamic Answer Options -->
+          <!-- Dynamic Answer Options / Text Box -->
+        </div>
+
+        <!-- Correct answer reveal for Text Answer mode -->
+        <div id="text-reveal-box" class="hidden text-center p-4 rounded-xl font-bold font-mono bg-green-500/10 border border-green-500 text-green-400">
+          <div class="text-xs text-gray-400 uppercase mb-1">Correct Answer</div>
+          <div id="text-correct-reveal-val" class="text-xl font-black">---</div>
         </div>
 
         <!-- Result Feedback Box -->
@@ -308,43 +374,75 @@
   <!-- Firebase Modular Scripts -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // Firebase Config
-    const firebaseConfig = {
+    // Firebase Config & App Init
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'quizes-48e98';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
       apiKey: "AIzaSyD25fXSbZ5FmvbmU8Kn7M82k5LOys566jU",
       authDomain: "quizes-48e98.firebaseapp.com",
       projectId: "quizes-48e98",
       storageBucket: "quizes-48e98.firebasestorage.app",
       messagingSenderId: "74301074044",
-      appId: "1:74301074044:web:4639d058aa181b41c577f9",
-      measurementId: "G-WP9450XZD8"
+      appId: "1:74301074044:web:4639d058aa181b41c577f9"
     };
 
     const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
     const db = getFirestore(app);
+
+    let currentUser = null;
+
+    // Authenticate First
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (e) {
+        console.warn("Auth init error:", e);
+      }
+    };
+    initAuth();
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        currentUser = user;
+        checkSubGateStatus();
+      }
+    });
 
     // Global Quiz Creation State
     let currentQuizQuestions = [];
     let currentImageBase64 = null;
     let selectedCorrectIdx = null;
 
-    // In-memory local dictionary for fast fallback lookup
+    // Question Mode: 'mcq' | 'poll' | 'text'
+    let currentQMode = 'mcq';
+
+    // In-memory local dictionary fallback
     window.localQuizzes = {};
 
     // Global Quiz Play State
     let activeQuizData = null;
+    let activeQuizCode = null;
     let activeQIndex = 0;
     let score = 0;
+    let currentPlayerName = "";
+    let isOwner = false;
+    let playerQuestionResponses = [];
 
-    // Matrix Background Animation
+    // Matrix Background Animation (0010100 Binary Rain 💻)
     const canvas = document.getElementById('matrix');
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     const cols = Math.floor(canvas.width / 18);
     const drops = Array(cols).fill(1);
-    const chars = 'アイウエオカキクケコZIHAN01010110ACCESSDENY';
+    const chars = '01010010100110101001';
     
     function drawMatrix() {
       ctx.fillStyle = 'rgba(0,0,0,0.05)';
@@ -365,20 +463,48 @@
       canvas.height = window.innerHeight;
     });
 
-    // Sub Gate Timers
-    window.onload = function() {
-      setTimeout(() => {
-        document.getElementById('gate-process').classList.add('hidden');
-        document.getElementById('gate-sub').classList.remove('hidden');
-      }, 3000);
-    };
+    // Sub Gate Timers & Firestore Memory check 🔐
+    async function checkSubGateStatus() {
+      let isSubbed = localStorage.getItem('ultra_quiz_subbed') === 'true';
 
-    window.handleSubscribe = function() {
+      if (!isSubbed && currentUser) {
+        try {
+          const subDoc = await getDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'status'));
+          if (subDoc.exists() && subDoc.data()?.subscribed) {
+            isSubbed = true;
+            localStorage.setItem('ultra_quiz_subbed', 'true');
+          }
+        } catch (e) {
+          console.warn("Sub gate fetch warning:", e);
+        }
+      }
+
+      if (isSubbed) {
+        document.getElementById('sub-gate-container').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+      } else {
+        setTimeout(() => {
+          document.getElementById('gate-process').classList.add('hidden');
+          document.getElementById('gate-sub').classList.remove('hidden');
+        }, 2000);
+      }
+    }
+
+    window.handleSubscribe = async function() {
       window.open('https://www.youtube.com/@Ultra-wk8ed', '_blank');
       const btn = document.getElementById('subBtn');
       btn.innerHTML = "[ CHECKING... ]<span class='blink'>_</span>";
       btn.classList.add('disabled');
       
+      // Save subscription in localStorage + Firestore
+      localStorage.setItem('ultra_quiz_subbed', 'true');
+      if (currentUser) {
+        setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'status'), {
+          subscribed: true,
+          updatedAt: new Date().toISOString()
+        }).catch(() => {});
+      }
+
       setTimeout(() => {
         document.getElementById('sub-gate-container').classList.add('hidden');
         document.getElementById('main-app').classList.remove('hidden');
@@ -398,6 +524,52 @@
       document.getElementById('dash-msg').innerText = '';
       document.getElementById('search-code-input').value = '';
     };
+
+    // Question Modes: Poll (🎭) and Text (🧩) Toggles
+    window.togglePollMode = function() {
+      if (currentQMode === 'poll') {
+        currentQMode = 'mcq';
+      } else {
+        currentQMode = 'poll';
+      }
+      updateModeButtonsUI();
+    };
+
+    window.toggleTextMode = function() {
+      if (currentQMode === 'text') {
+        currentQMode = 'mcq';
+      } else {
+        currentQMode = 'text';
+      }
+      updateModeButtonsUI();
+    };
+
+    function updateModeButtonsUI() {
+      const btnPoll = document.getElementById('btn-poll-mode');
+      const btnText = document.getElementById('btn-text-mode');
+      const mcqWrapper = document.getElementById('mcq-options-wrapper');
+      const textWrapper = document.getElementById('text-ans-wrapper');
+      const optLabel = document.getElementById('options-label-text');
+
+      btnPoll.classList.remove('btn-active-mode');
+      btnText.classList.remove('btn-active-mode');
+
+      if (currentQMode === 'poll') {
+        btnPoll.classList.add('btn-active-mode');
+        mcqWrapper.classList.remove('hidden');
+        textWrapper.classList.add('hidden');
+        optLabel.innerText = "Voting Poll Options (No correct answer required)";
+      } else if (currentQMode === 'text') {
+        btnText.classList.add('btn-active-mode');
+        mcqWrapper.classList.add('hidden');
+        textWrapper.classList.remove('hidden');
+      } else {
+        // Standard MCQ
+        mcqWrapper.classList.remove('hidden');
+        textWrapper.classList.add('hidden');
+        optLabel.innerText = "Answer Options (Click ● to mark Correct Answer)";
+      }
+    }
 
     // Option Field Generator (3 to 7 Options)
     function updateOptionCountUI() {
@@ -476,6 +648,8 @@
     };
 
     window.selectCorrectOption = function(idx) {
+      if (currentQMode === 'poll') return;
+
       selectedCorrectIdx = idx;
       const container = document.getElementById('options-list');
       Array.from(container.children).forEach((child, i) => {
@@ -494,6 +668,7 @@
 
     window.showCreator = function() {
       currentQuizQuestions = [];
+      currentQMode = 'mcq';
       resetQuestionForm();
       document.getElementById('q-num-display').innerText = '1';
       document.getElementById('total-q-count').innerText = '0';
@@ -507,8 +682,12 @@
       document.getElementById('img-preview').classList.add('hidden');
       document.getElementById('img-plus-icon').classList.remove('hidden');
       document.getElementById('img-hint-text').classList.remove('hidden');
+      document.getElementById('text-correct-ans-input').value = '';
+      
       currentImageBase64 = null;
       selectedCorrectIdx = null;
+      currentQMode = 'mcq';
+      updateModeButtonsUI();
       
       const container = document.getElementById('options-list');
       container.innerHTML = '';
@@ -540,6 +719,21 @@
         return false;
       }
 
+      if (currentQMode === 'text') {
+        const correctText = document.getElementById('text-correct-ans-input').value.trim();
+        if (!correctText) {
+          alert("Please type the correct text answer!");
+          return false;
+        }
+        return {
+          type: 'text',
+          question: text,
+          image: currentImageBase64,
+          correctText: correctText
+        };
+      }
+
+      // MCQ or Poll mode
       const optInputs = document.querySelectorAll('.opt-input');
       const options = [];
       let emptyFound = false;
@@ -558,16 +752,19 @@
         return false;
       }
 
-      if (selectedCorrectIdx === null || selectedCorrectIdx >= options.length) {
-        alert("Please select the correct answer by clicking the ● icon on one option!");
-        return false;
+      if (currentQMode === 'mcq') {
+        if (selectedCorrectIdx === null || selectedCorrectIdx >= options.length) {
+          alert("Please select the correct answer by clicking the ● icon on one option!");
+          return false;
+        }
       }
 
       return {
+        type: currentQMode,
         question: text,
         image: currentImageBase64,
         options: options,
-        correctIndex: selectedCorrectIdx
+        correctIndex: currentQMode === 'mcq' ? selectedCorrectIdx : null
       };
     }
 
@@ -583,21 +780,36 @@
       document.getElementById('total-q-count').innerText = currentQuizQuestions.length;
     };
 
-    // Generate random 11-character PIN Code
-    function generate11CharQuizCode() {
+    // Generate unique 11-character PIN Code
+    async function generateUnique11CharCode() {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let unique = false;
       let code = '';
-      for (let i = 0; i < 11; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+
+      while (!unique) {
+        code = '';
+        for (let i = 0; i < 11; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        if (window.localQuizzes[code]) continue;
+
+        try {
+          const docSnap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quizzes', code));
+          if (!docSnap.exists()) {
+            unique = true;
+          }
+        } catch (e) {
+          unique = true;
+        }
       }
       return code;
     }
 
     // Finish & Publish Quiz (✅ button)
-    window.finishAndPublishQuiz = function() {
+    window.finishAndPublishQuiz = async function() {
       const qTextInput = document.getElementById('q-text-input').value.trim();
       
-      // Auto save current input if typed
       if (qTextInput !== '') {
         const qData = validateCurrentQuestion();
         if (qData) {
@@ -612,27 +824,26 @@
         return;
       }
 
-      // Generate random 11-character PIN code
-      const quizCode = generate11CharQuizCode();
+      const quizCode = await generateUnique11CharCode();
 
       const quizPayload = {
         code: quizCode,
+        ownerUid: currentUser ? currentUser.uid : 'anonymous',
         questions: [...currentQuizQuestions],
         createdAt: new Date().toISOString()
       };
 
-      // Save locally in memory instantly
       window.localQuizzes[quizCode] = quizPayload;
 
-      // Instantly switch view & render code
       document.getElementById('generated-code').innerText = quizCode;
       showView('view-code-result');
       resetQuestionForm();
 
-      // Save to Firebase asynchronously in background
-      setDoc(doc(db, "quizzes", quizCode), quizPayload).catch(e => {
-        console.warn("Firestore sync warning (using local fallback):", e);
-      });
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quizzes', quizCode), quizPayload);
+      } catch (e) {
+        console.warn("Firestore sync warning:", e);
+      }
     };
 
     window.copyCodeToClipboard = function() {
@@ -665,37 +876,64 @@
       msgBox.innerText = "Searching quiz...";
       msgBox.className = "text-center text-sm font-mono text-gray-400";
 
-      // 1. Check local memory first
-      if (window.localQuizzes[codeInput]) {
-        activeQuizData = window.localQuizzes[codeInput];
-        startQuizPlayer();
+      let quizData = window.localQuizzes[codeInput] || null;
+
+      if (!quizData) {
+        try {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'quizzes', codeInput);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            quizData = docSnap.data();
+            window.localQuizzes[codeInput] = quizData;
+          }
+        } catch (e) {
+          console.error("Search error:", e);
+        }
+      }
+
+      if (!quizData) {
+        msgBox.innerText = "No Quiz Found! Check PIN code and try again.";
+        msgBox.className = "text-center text-sm font-mono text-red-400";
         return;
       }
 
-      // 2. Fetch from Firestore
-      try {
-        const docRef = doc(db, "quizzes", codeInput);
-        const docSnap = await getDoc(docRef);
+      activeQuizData = quizData;
+      activeQuizCode = codeInput;
 
-        if (docSnap.exists()) {
-          activeQuizData = docSnap.data();
-          window.localQuizzes[codeInput] = activeQuizData;
-          startQuizPlayer();
-        } else {
-          msgBox.innerText = "Quiz code not found! Check code and try again.";
-          msgBox.className = "text-center text-sm font-mono text-red-400";
-        }
-      } catch (e) {
-        console.error("Search error:", e);
-        msgBox.innerText = "Error searching quiz. Check connection and try again.";
-        msgBox.className = "text-center text-sm font-mono text-red-400";
+      // Check owner status
+      isOwner = currentUser && quizData.ownerUid === currentUser.uid;
+
+      // Prompt ALL users (including creator) for their name when opening quiz!
+      document.getElementById('player-name-input').value = '';
+      document.getElementById('name-modal').classList.remove('hidden');
+    };
+
+    window.confirmPlayerName = function() {
+      const name = document.getElementById('player-name-input').value.trim();
+      if (!name) {
+        alert("Please enter your name!");
+        return;
       }
+      currentPlayerName = name;
+      document.getElementById('name-modal').classList.add('hidden');
+      startQuizPlayer();
     };
 
     function startQuizPlayer() {
       activeQIndex = 0;
       score = 0;
+      playerQuestionResponses = [];
       showView('view-play');
+
+      // Toggle owner button 🥸 (Only creator sees this icon after going into their own quiz)
+      const ownerBtn = document.getElementById('owner-btn');
+      if (isOwner) {
+        ownerBtn.classList.remove('hidden');
+      } else {
+        ownerBtn.classList.add('hidden');
+      }
+
       renderQuestionInPlayer();
     }
 
@@ -715,22 +953,83 @@
         imgContainer.classList.add('hidden');
       }
 
-      // Feedback Reset
-      const feedback = document.getElementById('play-feedback');
-      feedback.classList.add('hidden');
+      // Reset feedback & text reveal
+      document.getElementById('play-feedback').classList.add('hidden');
+      document.getElementById('text-reveal-box').classList.add('hidden');
 
-      // Options
       const optionsBox = document.getElementById('play-options-container');
       optionsBox.innerHTML = '';
 
-      q.options.forEach((optText, idx) => {
-        const btn = document.createElement('button');
-        btn.className = "w-full text-left bg-black/60 border border-white/20 hover:border-white/60 p-4 rounded-xl text-white font-medium transition flex items-center justify-between";
-        btn.innerHTML = `<span>${optText}</span><span class="text-xs opacity-40 font-mono">Option ${idx + 1}</span>`;
-        btn.onclick = () => handleAnswerSubmission(idx, btn);
-        optionsBox.appendChild(btn);
-      });
+      if (q.type === 'text') {
+        // 🧩 Text Answer Mode
+        optionsBox.innerHTML = `
+          <div class="space-y-3">
+            <input id="player-text-input" type="text" placeholder="Type your answer here..." class="w-full bg-black/60 border border-white/30 rounded-xl p-4 text-white font-mono focus:outline-none focus:border-green-400" />
+            <button id="submit-text-ans-btn" onclick="handleTextAnswerSubmission()" class="w-full bg-green-500 text-black font-bold py-3 rounded-xl hover:bg-green-400 transition font-mono uppercase">
+              Submit Answer
+            </button>
+          </div>
+        `;
+      } else {
+        // MCQ or Poll Mode (🎭)
+        q.options.forEach((optText, idx) => {
+          const btn = document.createElement('button');
+          btn.className = "w-full text-left bg-black/60 border border-white/20 hover:border-white/60 p-4 rounded-xl text-white font-medium transition flex items-center justify-between";
+          btn.innerHTML = `<span>${optText}</span><span class="text-xs opacity-40 font-mono">Option ${String.fromCharCode(65 + idx)}</span>`;
+          btn.onclick = () => handleAnswerSubmission(idx, btn);
+          optionsBox.appendChild(btn);
+        });
+      }
     }
+
+    window.handleTextAnswerSubmission = function() {
+      const inputEl = document.getElementById('player-text-input');
+      const submitBtn = document.getElementById('submit-text-ans-btn');
+      const userAns = inputEl.value.trim();
+
+      if (!userAns) {
+        alert("Please enter an answer!");
+        return;
+      }
+
+      inputEl.disabled = true;
+      submitBtn.disabled = true;
+
+      const q = activeQuizData.questions[activeQIndex];
+      const correctAns = q.correctText || '';
+      
+      // Case-insensitive comparison (e.g. "hI" === "hi")
+      const isCorrect = userAns.toLowerCase() === correctAns.toLowerCase();
+
+      playerQuestionResponses.push({
+        qIndex: activeQIndex,
+        type: 'text',
+        userAns: userAns,
+        correctAns: correctAns,
+        isCorrect: isCorrect
+      });
+
+      const feedback = document.getElementById('play-feedback');
+      feedback.classList.remove('hidden');
+
+      if (isCorrect) {
+        score++;
+        feedback.innerText = "✨ CORRECT ANSWER!";
+        feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-green-500/20 border border-green-500 text-green-400";
+      } else {
+        feedback.innerText = "❌ WRONG ANSWER!";
+        feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-red-500/20 border border-red-500 text-red-400";
+
+        // Show "Correct Answer" box below
+        const textReveal = document.getElementById('text-reveal-box');
+        document.getElementById('text-correct-reveal-val').innerText = correctAns;
+        textReveal.classList.remove('hidden');
+      }
+
+      setTimeout(() => {
+        advanceQuestion();
+      }, 2000);
+    };
 
     function handleAnswerSubmission(selectedIdx, btnElement) {
       const q = activeQuizData.questions[activeQIndex];
@@ -741,28 +1040,78 @@
       const feedback = document.getElementById('play-feedback');
       feedback.classList.remove('hidden');
 
-      if (selectedIdx === q.correctIndex) {
-        score++;
+      if (q.type === 'poll') {
+        // 🎭 Poll Mode logic
+        playerQuestionResponses.push({
+          qIndex: activeQIndex,
+          type: 'poll',
+          selectedOption: q.options[selectedIdx],
+          selectedIdx: selectedIdx
+        });
+
         btnElement.classList.add('correct-anim');
-        feedback.innerText = "✨ CORRECT ANSWER!";
+        feedback.innerText = "🗳️ VOTE RECORDED!";
         feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-green-500/20 border border-green-500 text-green-400";
       } else {
-        btnElement.classList.add('wrong-anim');
-        if (allBtns[q.correctIndex]) {
-          allBtns[q.correctIndex].classList.add('correct-anim');
+        // Standard MCQ logic
+        const isCorrect = selectedIdx === q.correctIndex;
+        playerQuestionResponses.push({
+          qIndex: activeQIndex,
+          type: 'mcq',
+          selectedOption: q.options[selectedIdx],
+          correctOption: q.options[q.correctIndex],
+          selectedIdx: selectedIdx,
+          correctIdx: q.correctIndex,
+          isCorrect: isCorrect
+        });
+
+        if (isCorrect) {
+          score++;
+          btnElement.classList.add('correct-anim');
+          feedback.innerText = "✨ CORRECT ANSWER!";
+          feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-green-500/20 border border-green-500 text-green-400";
+        } else {
+          btnElement.classList.add('wrong-anim');
+          if (allBtns[q.correctIndex]) {
+            allBtns[q.correctIndex].classList.add('correct-anim');
+          }
+          feedback.innerText = "❌ WRONG ANSWER!";
+          feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-red-500/20 border border-red-500 text-red-400";
         }
-        feedback.innerText = "❌ WRONG ANSWER!";
-        feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-red-500/20 border border-red-500 text-red-400";
       }
 
       setTimeout(() => {
-        activeQIndex++;
-        if (activeQIndex < activeQuizData.questions.length) {
-          renderQuestionInPlayer();
-        } else {
-          showQuizSummary();
-        }
+        advanceQuestion();
       }, 1500);
+    }
+
+    function advanceQuestion() {
+      activeQIndex++;
+      if (activeQIndex < activeQuizData.questions.length) {
+        renderQuestionInPlayer();
+      } else {
+        finishQuizAndSaveAttempt();
+      }
+    }
+
+    async function finishQuizAndSaveAttempt() {
+      showQuizSummary();
+
+      // Save Attempt record into Firestore strictly
+      const attemptData = {
+        quizCode: activeQuizCode,
+        userName: currentPlayerName,
+        score: score,
+        totalQuestions: activeQuizData.questions.length,
+        responses: playerQuestionResponses,
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'attempts'), attemptData);
+      } catch (e) {
+        console.warn("Failed saving attempt:", e);
+      }
     }
 
     function showQuizSummary() {
@@ -772,6 +1121,7 @@
       const optionsBox = document.getElementById('play-options-container');
       document.getElementById('play-q-text').innerText = "Quiz Completed! 🏆";
       document.getElementById('play-img-container').classList.add('hidden');
+      document.getElementById('text-reveal-box').classList.add('hidden');
 
       optionsBox.innerHTML = `
         <div class="text-center space-y-4 py-6">
@@ -784,6 +1134,80 @@
       `;
       document.getElementById('play-feedback').classList.add('hidden');
     }
+
+    // OWNER LEADERBOARD (🥸) & ANALYTICS
+    window.openLeaderboard = async function() {
+      const modal = document.getElementById('leaderboard-modal');
+      const content = document.getElementById('leaderboard-content');
+      modal.classList.remove('hidden');
+      content.innerHTML = '<div class="text-center py-8 text-gray-400">Loading attempts...</div>';
+
+      try {
+        const querySnap = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'attempts'));
+        const attempts = [];
+        querySnap.forEach(d => {
+          const data = d.data();
+          if (data.quizCode === activeQuizCode) {
+            attempts.push(data);
+          }
+        });
+
+        // Sort latest first
+        attempts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        if (attempts.length === 0) {
+          content.innerHTML = '<div class="text-center py-8 text-gray-400">No responses recorded yet!</div>';
+          return;
+        }
+
+        let html = '';
+        attempts.forEach(att => {
+          html += `
+            <div class="bg-black/60 border border-white/20 rounded-xl p-4 space-y-2">
+              <div class="flex justify-between items-center text-green-400 font-bold border-b border-white/10 pb-2">
+                <span>Name: ${att.userName}</span>
+                <span>Score: ${att.score} out of ${att.totalQuestions}</span>
+              </div>
+              <div class="space-y-1 text-xs text-gray-300 pt-1">
+          `;
+
+          if (att.responses && att.responses.length > 0) {
+            att.responses.forEach((resp, i) => {
+              if (resp.type === 'poll') {
+                html += `<div>Q${i+1} (Poll): Voted <strong>${resp.selectedOption || 'N/A'}</strong></div>`;
+              } else if (resp.type === 'text') {
+                if (resp.isCorrect) {
+                  html += `<div class="text-green-400">Q${i+1}: put '${resp.userAns}' (Correct)</div>`;
+                } else {
+                  html += `<div class="text-red-400">Q${i+1}: put '${resp.userAns}' instead of '${resp.correctAns}'</div>`;
+                }
+              } else { // MCQ
+                if (resp.isCorrect) {
+                  html += `<div class="text-green-400">Q${i+1}: Selected Option ${String.fromCharCode(65 + resp.selectedIdx)} (Correct)</div>`;
+                } else {
+                  html += `<div class="text-red-400">Q${i+1}: put Option ${String.fromCharCode(65 + resp.selectedIdx)} instead of Option ${String.fromCharCode(65 + resp.correctIdx)}</div>`;
+                }
+              }
+            });
+          }
+
+          html += `
+              </div>
+            </div>
+          `;
+        });
+
+        content.innerHTML = html;
+
+      } catch (e) {
+        console.error("Error loading leaderboard:", e);
+        content.innerHTML = '<div class="text-center py-8 text-red-400">Error loading response analytics.</div>';
+      }
+    };
+
+    window.closeLeaderboard = function() {
+      document.getElementById('leaderboard-modal').classList.add('hidden');
+    };
   </script>
 </body>
 </html>
