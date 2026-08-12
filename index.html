@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -189,8 +190,8 @@
     <div class="wide-design max-w-md w-full p-6 rounded-2xl border border-green-500 shadow-[0_0_30px_rgba(0,255,65,0.2)] text-center space-y-4">
       <div class="text-3xl">👤</div>
       <h3 class="font-[Orbitron] text-xl font-bold tracking-wider text-green-400">ENTER YOUR NAME</h3>
-      <p class="text-xs text-gray-400 font-mono">Please enter your name to start playing this quiz!</p>
-      <input id="player-name-input" type="text" maxlength="20" placeholder="Your Name..." class="w-full bg-black border border-white/30 rounded-xl p-3 text-white focus:outline-none focus:border-green-400 text-center font-bold tracking-wider" />
+      <p class="text-xs text-gray-400 font-mono">Name must be 2 to 10 characters long!</p>
+      <input id="player-name-input" type="text" minlength="2" maxlength="10" placeholder="Your Name (2-10 chars)..." class="w-full bg-black border border-white/30 rounded-xl p-3 text-white focus:outline-none focus:border-green-400 text-center font-bold tracking-wider" />
       <button onclick="confirmPlayerName()" class="w-full bg-green-500 text-black font-black py-3 rounded-xl hover:bg-green-400 transition font-mono uppercase">
         Done
       </button>
@@ -689,11 +690,18 @@
 
     function resetQuestionForm() {
       document.getElementById('q-text-input').value = '';
-      document.getElementById('q-img-input').value = '';
-      document.getElementById('img-preview').src = '';
-      document.getElementById('img-preview').classList.add('hidden');
-      document.getElementById('img-plus-icon').classList.remove('hidden');
-      document.getElementById('img-hint-text').classList.remove('hidden');
+      
+      const fileInput = document.getElementById('q-img-input');
+      if (fileInput) fileInput.value = '';
+
+      const previewImg = document.getElementById('img-preview');
+      if (previewImg) {
+        previewImg.removeAttribute('src');
+        previewImg.classList.add('hidden');
+      }
+
+      document.getElementById('img-plus-icon')?.classList.remove('hidden');
+      document.getElementById('img-hint-text')?.classList.remove('hidden');
       document.getElementById('text-correct-ans-input').value = '';
       
       currentImageBase64 = null;
@@ -745,27 +753,29 @@
         };
       }
 
+      // MCQ or Poll mode: Filter non-empty options automatically!
       const optInputs = document.querySelectorAll('.opt-input');
-      const options = [];
-      let emptyFound = false;
+      const validOptions = [];
+      let mappedCorrectIdx = null;
 
-      optInputs.forEach(input => {
+      optInputs.forEach((input, originalIdx) => {
         const val = input.value.trim();
-        if (val) {
-          options.push(val);
-        } else {
-          emptyFound = true;
+        if (val !== '') {
+          validOptions.push(val);
+          if (originalIdx === selectedCorrectIdx) {
+            mappedCorrectIdx = validOptions.length - 1;
+          }
         }
       });
 
-      if (emptyFound || options.length < 3) {
-        alert("Please fill out all option fields (Minimum 3 required)!");
+      if (validOptions.length < 2) {
+        alert("Please enter at least 2 non-empty options!");
         return false;
       }
 
       if (currentQMode === 'mcq') {
-        if (selectedCorrectIdx === null || selectedCorrectIdx >= options.length) {
-          alert("Please select the correct answer by clicking the ● icon on one option!");
+        if (mappedCorrectIdx === null) {
+          alert("Please select the correct answer by clicking the ● icon on one filled option!");
           return false;
         }
       }
@@ -774,8 +784,8 @@
         type: currentQMode,
         question: text,
         image: currentImageBase64,
-        options: options,
-        correctIndex: currentQMode === 'mcq' ? selectedCorrectIdx : null
+        options: validOptions,
+        correctIndex: currentQMode === 'mcq' ? mappedCorrectIdx : null
       };
     }
 
@@ -817,6 +827,19 @@
       return code;
     }
 
+    // Save created quiz code locally so creator ALWAYS sees 🥸 icon!
+    function markCodeAsCreated(code) {
+      try {
+        const created = JSON.parse(localStorage.getItem('my_created_quizzes') || '[]');
+        if (!created.includes(code)) {
+          created.push(code);
+          localStorage.setItem('my_created_quizzes', JSON.stringify(created));
+        }
+      } catch (e) {
+        console.warn("LocalStorage save error:", e);
+      }
+    }
+
     // Finish & Publish Quiz (✅ button)
     window.finishAndPublishQuiz = async function() {
       const qTextInput = document.getElementById('q-text-input').value.trim();
@@ -845,9 +868,12 @@
       };
 
       window.localQuizzes[quizCode] = quizPayload;
+      markCodeAsCreated(quizCode);
 
       document.getElementById('generated-code').innerText = quizCode;
       showView('view-code-result');
+      
+      currentQuizQuestions = [];
       resetQuestionForm();
 
       try {
@@ -913,19 +939,26 @@
       activeQuizCode = codeInput;
 
       // Check owner status
-      isOwner = currentUser && quizData.ownerUid === currentUser.uid;
+      const myCreated = JSON.parse(localStorage.getItem('my_created_quizzes') || '[]');
+      isOwner = myCreated.includes(codeInput) || (currentUser && quizData.ownerUid === currentUser.uid);
 
-      // Prompt ALL users for name when opening quiz
-      document.getElementById('player-name-input').value = '';
-      document.getElementById('name-modal').classList.remove('hidden');
+      if (isOwner) {
+        currentPlayerName = "Owner 🥸";
+        startQuizPlayer();
+      } else {
+        document.getElementById('player-name-input').value = '';
+        document.getElementById('name-modal').classList.remove('hidden');
+      }
     };
 
     window.confirmPlayerName = function() {
       const name = document.getElementById('player-name-input').value.trim();
-      if (!name) {
-        alert("Please enter your name!");
+      
+      if (name.length < 2 || name.length > 10) {
+        alert("Name must be between 2 and 10 characters!");
         return;
       }
+
       currentPlayerName = name;
       document.getElementById('name-modal').classList.add('hidden');
       startQuizPlayer();
@@ -937,7 +970,6 @@
       playerQuestionResponses = [];
       showView('view-play');
 
-      // Toggle owner button 🥸
       const ownerBtn = document.getElementById('owner-btn');
       if (isOwner) {
         ownerBtn.classList.remove('hidden');
@@ -1050,7 +1082,6 @@
       feedback.classList.remove('hidden');
 
       if (q.type === 'poll') {
-        // 🎭 Poll Mode: Doesn't count toward score/total graded questions!
         playerQuestionResponses.push({
           qIndex: activeQIndex,
           type: 'poll',
@@ -1103,7 +1134,6 @@
     }
 
     async function finishQuizAndSaveAttempt() {
-      // Exclude voting poll questions from total score calculations
       const gradedQuestions = activeQuizData.questions.filter(q => q.type !== 'poll');
       const totalGraded = gradedQuestions.length;
 
