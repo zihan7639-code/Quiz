@@ -173,7 +173,7 @@
       <div id="gate-sub" class="hidden text-center">
         <div class="mb-6">
           <span class="text-3xl inline-block mb-2 text-red-500 drop-shadow-[0_0_8px_rgba(255,51,51,0.8)]">⚠</span>
-          <h1 class="font-[Orbitron] text-lg font-black tracking-[6px] uppercase text-red-500 drop-shadow-[0_0_10px_rgba(255,51,51,0.8)]">JOIN DBI</h1>
+          <h1 class="font-[Orbitron] text-lg font-black tracking-[6px] uppercase text-red-500 drop-shadow-[0_0_10px_rgba(255,51,51,0.8)]">JOIN QUIZ</h1>
           <div class="text-xs text-green-700 tracking-[3px] mt-2">Subscription Required for Access</div>
         </div>
         <hr class="border-t border-green-900 mb-6 opacity-40"/>
@@ -392,6 +392,27 @@
     const db = getFirestore(app);
 
     let currentUser = null;
+    let gateHandled = false;
+
+    // Direct unlock helper
+    function resolveGate(isSubbed) {
+      if (gateHandled) return;
+      gateHandled = true;
+
+      if (isSubbed) {
+        document.getElementById('sub-gate-container')?.classList.add('hidden');
+        document.getElementById('main-app')?.classList.remove('hidden');
+      } else {
+        document.getElementById('gate-process')?.classList.add('hidden');
+        document.getElementById('gate-sub')?.classList.remove('hidden');
+      }
+    }
+
+    // Unstuck init screen with fast timer
+    setTimeout(() => {
+      const isSubbed = localStorage.getItem('ultra_quiz_subbed') === 'true';
+      resolveGate(isSubbed);
+    }, 1000);
 
     // Authenticate First
     const initAuth = async () => {
@@ -478,24 +499,17 @@
         }
       }
 
-      if (isSubbed) {
-        document.getElementById('sub-gate-container').classList.add('hidden');
-        document.getElementById('main-app').classList.remove('hidden');
-      } else {
-        setTimeout(() => {
-          document.getElementById('gate-process').classList.add('hidden');
-          document.getElementById('gate-sub').classList.remove('hidden');
-        }, 2000);
-      }
+      resolveGate(isSubbed);
     }
 
-    window.handleSubscribe = async function() {
+    window.handleSubscribe = function() {
       window.open('https://www.youtube.com/@Ultra-wk8ed', '_blank');
-      const btn = document.getElementById('subBtn');
-      btn.innerHTML = "[ CHECKING... ]<span class='blink'>_</span>";
-      btn.classList.add('disabled');
       
-      // Save subscription in localStorage + Firestore
+      const btn = document.getElementById('subBtn');
+      if (btn) {
+        btn.innerHTML = "[ UNLOCKING... ]<span class='blink'>_</span>";
+      }
+
       localStorage.setItem('ultra_quiz_subbed', 'true');
       if (currentUser) {
         setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'profile', 'status'), {
@@ -505,9 +519,9 @@
       }
 
       setTimeout(() => {
-        document.getElementById('sub-gate-container').classList.add('hidden');
-        document.getElementById('main-app').classList.remove('hidden');
-      }, 2000);
+        gateHandled = false;
+        resolveGate(true);
+      }, 500);
     };
 
     // Navigation Helper
@@ -563,7 +577,6 @@
         mcqWrapper.classList.add('hidden');
         textWrapper.classList.remove('hidden');
       } else {
-        // Standard MCQ
         mcqWrapper.classList.remove('hidden');
         textWrapper.classList.add('hidden');
         optLabel.innerText = "Answer Options (Click ● to mark Correct Answer)";
@@ -732,7 +745,6 @@
         };
       }
 
-      // MCQ or Poll mode
       const optInputs = document.querySelectorAll('.opt-input');
       const options = [];
       let emptyFound = false;
@@ -903,7 +915,7 @@
       // Check owner status
       isOwner = currentUser && quizData.ownerUid === currentUser.uid;
 
-      // Prompt ALL users (including creator) for their name when opening quiz!
+      // Prompt ALL users for name when opening quiz
       document.getElementById('player-name-input').value = '';
       document.getElementById('name-modal').classList.remove('hidden');
     };
@@ -925,7 +937,7 @@
       playerQuestionResponses = [];
       showView('view-play');
 
-      // Toggle owner button 🥸 (Only creator sees this icon after going into their own quiz)
+      // Toggle owner button 🥸
       const ownerBtn = document.getElementById('owner-btn');
       if (isOwner) {
         ownerBtn.classList.remove('hidden');
@@ -997,7 +1009,6 @@
       const q = activeQuizData.questions[activeQIndex];
       const correctAns = q.correctText || '';
       
-      // Case-insensitive comparison (e.g. "hI" === "hi")
       const isCorrect = userAns.toLowerCase() === correctAns.toLowerCase();
 
       playerQuestionResponses.push({
@@ -1019,7 +1030,6 @@
         feedback.innerText = "❌ WRONG ANSWER!";
         feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-red-500/20 border border-red-500 text-red-400";
 
-        // Show "Correct Answer" box below
         const textReveal = document.getElementById('text-reveal-box');
         document.getElementById('text-correct-reveal-val').innerText = correctAns;
         textReveal.classList.remove('hidden');
@@ -1040,7 +1050,7 @@
       feedback.classList.remove('hidden');
 
       if (q.type === 'poll') {
-        // 🎭 Poll Mode logic
+        // 🎭 Poll Mode: Doesn't count toward score/total graded questions!
         playerQuestionResponses.push({
           qIndex: activeQIndex,
           type: 'poll',
@@ -1052,7 +1062,6 @@
         feedback.innerText = "🗳️ VOTE RECORDED!";
         feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-green-500/20 border border-green-500 text-green-400";
       } else {
-        // Standard MCQ logic
         const isCorrect = selectedIdx === q.correctIndex;
         playerQuestionResponses.push({
           qIndex: activeQIndex,
@@ -1094,14 +1103,17 @@
     }
 
     async function finishQuizAndSaveAttempt() {
-      showQuizSummary();
+      // Exclude voting poll questions from total score calculations
+      const gradedQuestions = activeQuizData.questions.filter(q => q.type !== 'poll');
+      const totalGraded = gradedQuestions.length;
 
-      // Save Attempt record into Firestore strictly
+      showQuizSummary(totalGraded);
+
       const attemptData = {
         quizCode: activeQuizCode,
         userName: currentPlayerName,
         score: score,
-        totalQuestions: activeQuizData.questions.length,
+        totalQuestions: totalGraded,
         responses: playerQuestionResponses,
         timestamp: new Date().toISOString()
       };
@@ -1113,9 +1125,8 @@
       }
     }
 
-    function showQuizSummary() {
-      const total = activeQuizData.questions.length;
-      const percentage = Math.round((score / total) * 100);
+    function showQuizSummary(totalGraded) {
+      const percentage = totalGraded > 0 ? Math.round((score / totalGraded) * 100) : 100;
 
       const optionsBox = document.getElementById('play-options-container');
       document.getElementById('play-q-text').innerText = "Quiz Completed! 🏆";
@@ -1124,7 +1135,7 @@
 
       optionsBox.innerHTML = `
         <div class="text-center space-y-4 py-6">
-          <div class="text-5xl font-black font-mono text-green-400">${score} / ${total}</div>
+          <div class="text-5xl font-black font-mono text-green-400">${score} / ${totalGraded}</div>
           <div class="text-xl font-bold">Accuracy: ${percentage}%</div>
           <button onclick="goHome()" class="bg-white text-black font-bold px-8 py-3 rounded-xl hover:bg-gray-200 transition mt-4">
             Back to Home
@@ -1151,7 +1162,6 @@
           }
         });
 
-        // Sort latest first
         attempts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
         if (attempts.length === 0) {
@@ -1173,7 +1183,7 @@
           if (att.responses && att.responses.length > 0) {
             att.responses.forEach((resp, i) => {
               if (resp.type === 'poll') {
-                html += `<div>Q${i+1} (Poll): Voted <strong>${resp.selectedOption || 'N/A'}</strong></div>`;
+                html += `<div>Q${i+1} (Poll): Chose <strong>'${resp.selectedOption || 'N/A'}'</strong></div>`;
               } else if (resp.type === 'text') {
                 if (resp.isCorrect) {
                   html += `<div class="text-green-400">Q${i+1}: put '${resp.userAns}' (Correct)</div>`;
