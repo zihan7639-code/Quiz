@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -103,13 +102,6 @@
       box-shadow: 0 0 24px var(--green-glow);
     }
 
-    .cyber-btn.disabled {
-      color: var(--green-dim);
-      border-color: var(--green-dim);
-      cursor: not-allowed;
-      box-shadow: none;
-    }
-
     .blink { animation: blink 1s step-end infinite; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
@@ -158,6 +150,12 @@
 
   <!-- Matrix Canvas -->
   <canvas id="matrix"></canvas>
+
+  <!-- Toast Notification Box -->
+  <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-red-950/90 border border-red-500 text-red-200 px-6 py-3 rounded-xl font-mono text-sm shadow-[0_0_25px_rgba(255,51,51,0.6)] backdrop-blur-md flex items-center gap-2">
+    <span>⚠️</span>
+    <span id="toast-msg">Notification Message</span>
+  </div>
 
   <!-- STEP 1: SUB GATE -->
   <div id="sub-gate-container" class="fixed inset-0 z-50 flex items-center justify-center bg-black">
@@ -377,6 +375,19 @@
     import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+    // Toast helper to replace window.alert
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      if (toast && toastMsg) {
+        toastMsg.innerText = msg;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 3000);
+      }
+    }
+
     // Firebase Config & App Init
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'quizes-48e98';
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
@@ -409,7 +420,7 @@
       }
     }
 
-    // Unstuck init screen with fast timer
+    // Timer fallback gate unlock check
     setTimeout(() => {
       const isSubbed = localStorage.getItem('ultra_quiz_subbed') === 'true';
       resolveGate(isSubbed);
@@ -456,13 +467,13 @@
     let isOwner = false;
     let playerQuestionResponses = [];
 
-    // Matrix Background Animation (0010100 Binary Rain 💻)
+    // Matrix Background Animation
     const canvas = document.getElementById('matrix');
     const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const cols = Math.floor(canvas.width / 18);
-    const drops = Array(cols).fill(1);
+    let cols = Math.floor(canvas.width / 18);
+    let drops = Array(cols).fill(1);
     const chars = '01010010100110101001';
     
     function drawMatrix() {
@@ -482,9 +493,11 @@
     window.addEventListener('resize', () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      cols = Math.floor(canvas.width / 18);
+      drops = Array(cols).fill(1);
     });
 
-    // Sub Gate Timers & Firestore Memory check 🔐
+    // Sub Gate Timers & Firestore Memory check
     async function checkSubGateStatus() {
       let isSubbed = localStorage.getItem('ultra_quiz_subbed') === 'true';
 
@@ -635,6 +648,10 @@
         const selectBtn = row.querySelector('.opt-select-btn');
         if (selectBtn) selectBtn.setAttribute('onclick', `selectCorrectOption(${i})`);
       });
+
+      if (selectedCorrectIdx !== null) {
+        window.selectCorrectOption(selectedCorrectIdx);
+      }
     }
 
     window.addOptionField = function() {
@@ -735,14 +752,14 @@
     function validateCurrentQuestion() {
       const text = document.getElementById('q-text-input').value.trim();
       if (!text) {
-        alert("Please enter question text!");
+        showToast("Please enter question text!");
         return false;
       }
 
       if (currentQMode === 'text') {
         const correctText = document.getElementById('text-correct-ans-input').value.trim();
         if (!correctText) {
-          alert("Please type the correct text answer!");
+          showToast("Please type the correct text answer!");
           return false;
         }
         return {
@@ -753,7 +770,6 @@
         };
       }
 
-      // MCQ or Poll mode: Filter non-empty options automatically!
       const optInputs = document.querySelectorAll('.opt-input');
       const validOptions = [];
       let mappedCorrectIdx = null;
@@ -769,13 +785,13 @@
       });
 
       if (validOptions.length < 2) {
-        alert("Please enter at least 2 non-empty options!");
+        showToast("Please enter at least 2 non-empty options!");
         return false;
       }
 
       if (currentQMode === 'mcq') {
         if (mappedCorrectIdx === null) {
-          alert("Please select the correct answer by clicking the ● icon on one filled option!");
+          showToast("Please mark the correct answer by clicking ●!");
           return false;
         }
       }
@@ -827,7 +843,7 @@
       return code;
     }
 
-    // Save created quiz code locally so creator ALWAYS sees 🥸 icon!
+    // Save created quiz code locally
     function markCodeAsCreated(code) {
       try {
         const created = JSON.parse(localStorage.getItem('my_created_quizzes') || '[]');
@@ -854,7 +870,7 @@
       }
 
       if (currentQuizQuestions.length === 0) {
-        alert("Please add at least one complete question before publishing!");
+        showToast("Please add at least one complete question before publishing!");
         return;
       }
 
@@ -955,7 +971,7 @@
       const name = document.getElementById('player-name-input').value.trim();
       
       if (name.length < 2 || name.length > 10) {
-        alert("Name must be between 2 and 10 characters!");
+        showToast("Name must be between 2 and 10 characters!");
         return;
       }
 
@@ -1004,7 +1020,7 @@
       optionsBox.innerHTML = '';
 
       if (q.type === 'text') {
-        // 🧩 Text Answer Mode
+        // Text Answer Mode
         optionsBox.innerHTML = `
           <div class="space-y-3">
             <input id="player-text-input" type="text" placeholder="Type your answer here..." class="w-full bg-black/60 border border-white/30 rounded-xl p-4 text-white font-mono focus:outline-none focus:border-green-400" />
@@ -1014,7 +1030,7 @@
           </div>
         `;
       } else {
-        // MCQ or Poll Mode (🎭)
+        // MCQ or Poll Mode
         q.options.forEach((optText, idx) => {
           const btn = document.createElement('button');
           btn.className = "w-full text-left bg-black/60 border border-white/20 hover:border-white/60 p-4 rounded-xl text-white font-medium transition flex items-center justify-between";
@@ -1031,7 +1047,7 @@
       const userAns = inputEl.value.trim();
 
       if (!userAns) {
-        alert("Please enter an answer!");
+        showToast("Please enter an answer!");
         return;
       }
 
@@ -1251,4 +1267,3 @@
 </body>
 </html>
 
-```
