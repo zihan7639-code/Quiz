@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ultra Quizes ⚡</title>
+  <!-- Google Fonts -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Montserrat:wght@300;400;700&display=swap">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #00ff41;
+      --green-dim: #00aa2a;
+      --green-glow: rgba(0,255,65,0.25);
+      --red: #ff3333;
+      --bg: #000000;
+    }
+
+    body {
+      background: var(--bg);
+      color: #ffffff;
+      font-family: 'Montserrat', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      margin: 0;
+    }
+
+    /* Scanline overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,255,65,0.015) 2px,
+        rgba(0,255,65,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* Rain canvas */
+    #matrix {
+      position: fixed;
+      inset: 0;
+      opacity: 0.12;
+      z-index: 0;
+    }
+
+    /* GATE SYSTEM STYLES - RESPONSIVE UPDATES */
+    .gate {
+      position: relative;
+      z-index: 10;
+      width: 90%;
+      max-width: 440px;
+      background: rgba(0,0,0,0.92);
+      border: 1px solid var(--green-dim);
+      box-shadow: 0 0 40px var(--green-glow), inset 0 0 40px rgba(0,255,65,0.03);
+      padding: 2rem 1.5rem;
+      animation: flicker 8s infinite;
+      min-height: 320px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--green);
+    }
+
+    .gate::before, .gate::after {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-color: var(--green);
+      border-style: solid;
+    }
+    .gate::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+    .gate::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .header .skull {
+      font-size: 32px;
+      display: block;
+      margin-bottom: 8px;
+      filter: drop-shadow(0 0 8px var(--green));
+    }
+
+    .header h1 {
+      font-family: 'Orbitron', monospace;
+      font-size: 20px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px var(--green);
+    }
+
+    .header .sub {
+      font-size: 12px;
+      color: var(--green-dim);
+      letter-spacing: 2px;
+      margin-top: 6px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--green-dim);
+      margin: 0 0 24px;
+      opacity: 0.4;
+    }
+
+    .cyber-btn {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      background: transparent;
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 16px 12px;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+      position: relative;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+
+    .cyber-btn:hover {
+      background: rgba(0,255,65,0.1);
+      box-shadow: 0 0 24px var(--green-glow);
+    }
+
+    .cyber-btn:active {
+      background: rgba(0,255,65,0.2);
+    }
+
+    .cyber-btn.disabled {
+      color: var(--green-dim);
+      border-color: var(--green-dim);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .cyber-btn.disabled:hover { background: transparent; box-shadow: none; }
+
+    /* Step System */
+    .step { display: none; width: 100%; }
+    .step.active { display: block; }
+
+    /* Animations */
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes flicker { 0%, 98%, 100% { opacity: 1; } 99% { opacity: 0.85; } }
+    .blink { animation: blink 1s step-end infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    .loading-bar {
+      width: 0%;
+      height: 2px;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      margin-top: 20px;
+      transition: width 0.8s ease;
+    }
+
+    /* Custom Design for Main Page */
+    .headline-font {
+      font-family: 'Orbitron', sans-serif;
+      text-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+    }
+
+    .wide-design {
+      background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.05);
+    }
+
+    .correct-anim {
+      animation: popGreen 0.5s forwards;
+    }
+    .wrong-anim {
+      animation: shakeRed 0.5s forwards;
+    }
+
+    @keyframes popGreen {
+      0% { transform: scale(1); background-color: rgba(0,255,65,0.1); }
+      50% { transform: scale(1.05); background-color: rgba(0,255,65,0.4); border-color: #00ff41; }
+      100% { transform: scale(1); background-color: rgba(0,255,65,0.2); border-color: #00ff41; }
+    }
+
+    @keyframes shakeRed {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); background-color: rgba(255,51,51,0.3); border-color: #ff3333; }
+      40%, 80% { transform: translateX(8px); background-color: rgba(255,51,51,0.3); border-color: #ff3333; }
+    }
+
+    .btn-active-mode {
+      background-color: #00ff41 !important;
+      color: #000000 !important;
+      border-color: #00ff41 !important;
+      box-shadow: 0 0 12px #00ff41;
+    }
+  </style>
+</head>
+<body class="scanlines">
+
+  <!-- 01100 Matrix Canvas -->
+  <canvas id="matrix"></canvas>
+
+  <!-- Toast Notification Box -->
+  <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-red-950/90 border border-red-500 text-red-200 px-6 py-3 rounded-xl font-mono text-sm shadow-[0_0_25px_rgba(255,51,51,0.6)] backdrop-blur-md flex items-center gap-2">
+    <span>⚠️</span>
+    <span id="toast-msg">Notification Message</span>
+  </div>
+
+  <!-- SUB GATE -->
+  <div id="sub-gate-container" class="fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
+    <div class="gate">
+
+      <!-- STEP PROCESS (2 SEC TIMER) -->
+      <div id="step-process" class="step active text-center">
+        <div class="header">
+          <span class="skull" style="animation: pulse 1s infinite;">⬡</span>
+          <h1>SYSTEM INIT</h1>
+          <div class="sub">Verifying Gmail Session...</div>
+        </div>
+        <div class="loading-bar" style="width: 100%; animation: pulse 1s infinite;"></div>
+      </div>
+
+      <!-- STEP 1 (SUBSCRIBE TO UNLOCK) -->
+      <div id="step1" class="step">
+        <div class="header">
+          <span class="skull" style="color: var(--red); filter: drop-shadow(0 0 8px var(--red));">⚠</span>
+          <h1 style="color: var(--red); text-shadow: 0 0 10px var(--red);">SUB TO ULTRA</h1>
+          <div class="sub">Subscription Required for Access</div>
+        </div>
+        <hr class="divider"/>
+        <button id="subBtn" class="cyber-btn" onclick="handleSubscribe()">
+          [ SUBSCRIBE TO UNLOCK ]<span class="blink">_</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- NAME PROMPT MODAL -->
+  <div id="name-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="wide-design max-w-md w-full p-6 sm:p-8 rounded-2xl border border-green-500 shadow-[0_0_30px_rgba(0,255,65,0.2)] text-center space-y-4">
+      <div class="text-4xl">👤</div>
+      <h3 class="font-[Orbitron] text-xl sm:text-2xl font-bold tracking-wider text-green-400">ENTER YOUR NAME</h3>
+      <p class="text-xs sm:text-sm text-gray-400 font-mono">Name must be 2 to 10 characters long!</p>
+      <input id="player-name-input" type="text" minlength="2" maxlength="10" placeholder="Your Name (2-10 chars)..." class="w-full bg-black border border-white/30 rounded-xl p-3 sm:p-4 text-white focus:outline-none focus:border-green-400 text-center font-bold tracking-wider text-base sm:text-lg" />
+      <button onclick="confirmPlayerName()" class="w-full bg-green-500 text-black font-black py-3 sm:py-4 rounded-xl hover:bg-green-400 transition font-mono uppercase text-base sm:text-lg">
+        Done
+      </button>
+    </div>
+  </div>
+
+  <!-- OWNER LEADERBOARD MODAL (🥸) -->
+  <div id="leaderboard-modal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="wide-design max-w-2xl w-full p-6 sm:p-8 rounded-2xl border border-green-500 shadow-[0_0_30px_rgba(0,255,65,0.3)] space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-white/10 pb-3">
+        <h3 class="font-[Orbitron] text-base sm:text-lg font-bold text-green-400 flex items-center gap-2">
+          🥸 OWNER ANALYTICS & RESPONSES
+        </h3>
+        <button onclick="closeLeaderboard()" class="text-gray-400 hover:text-white font-mono text-xl p-1">✕</button>
+      </div>
+      
+      <div id="leaderboard-content" class="overflow-y-auto space-y-3 pr-2 flex-1 font-mono text-sm">
+        <!-- Results rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="main-app" class="hidden relative z-10 min-h-screen flex flex-col items-center p-4 sm:p-8">
+    
+    <!-- Wide White Design Container -->
+    <div class="wide-design w-full max-w-4xl rounded-2xl p-5 sm:p-10 my-auto backdrop-blur-md">
+      
+      <!-- Headline -->
+      <h1 class="headline-font text-3xl sm:text-5xl md:text-6xl text-center font-black tracking-widest text-white mb-6 sm:mb-8">
+        Ultra Quizes ⚡
+      </h1>
+
+      <!-- VIEW 1: Main Dashboard (Search & Add) -->
+      <div id="view-dashboard" class="space-y-6 sm:space-y-8">
+        <div class="flex items-center gap-2 sm:gap-3 bg-black/60 border border-white/20 rounded-full px-3 py-2 sm:px-4 sm:py-2.5 shadow-inner focus-within:border-white/60 transition">
+          <!-- + Icon to Create Quiz -->
+          <button onclick="showCreator()" class="text-2xl sm:text-3xl font-bold text-white hover:text-green-400 transition transform hover:scale-110 px-1 sm:px-2" title="Create Quiz">
+            +
+          </button>
+          <!-- Search Bar -->
+          <input id="search-code-input" type="text" maxlength="11" placeholder="Enter 11-digit Quiz Code..." class="w-full bg-transparent text-white focus:outline-none text-sm sm:text-lg tracking-wider font-mono px-1 sm:px-2" />
+          <button onclick="searchQuiz()" class="bg-white text-black px-4 py-2 sm:px-6 sm:py-2.5 rounded-full font-semibold hover:bg-gray-200 transition text-sm sm:text-base">
+            Search
+          </button>
+        </div>
+        <div id="dash-msg" class="text-center text-sm font-mono min-h-[20px]"></div>
+      </div>
+
+      <!-- VIEW 2: Create Quiz -->
+      <div id="view-create" class="hidden space-y-6">
+        <div class="flex justify-between items-center border-b border-white/10 pb-4">
+          <h2 class="text-lg sm:text-xl font-bold tracking-wider font-mono text-gray-300">
+            CREATE QUESTION #<span id="q-num-display">1</span>
+          </h2>
+          <span class="text-xs font-mono text-gray-500">Auto-saves on publish</span>
+        </div>
+
+        <!-- Add Text Bar (Question) -->
+        <div class="space-y-2">
+          <label class="text-xs tracking-wider text-gray-400 uppercase font-mono">Question Text</label>
+          <input id="q-text-input" type="text" placeholder="Type your question here..." class="w-full bg-black/50 border border-white/20 rounded-lg p-3 text-white focus:outline-none focus:border-white transition text-sm sm:text-base" />
+        </div>
+
+        <!-- Big + Icon (Image Upload) -->
+        <div class="space-y-2">
+          <label class="text-xs tracking-wider text-gray-400 uppercase font-mono">Question Image (Optional)</label>
+          <div id="img-picker-box" onclick="document.getElementById('q-img-input').click()" class="border-2 border-dashed border-white/20 hover:border-white/50 rounded-xl h-40 flex flex-col items-center justify-center cursor-pointer transition bg-black/30 overflow-hidden relative">
+            <span id="img-plus-icon" class="text-5xl text-white/50 font-light">+</span>
+            <span id="img-hint-text" class="text-xs text-gray-400 mt-2">Click to select photo</span>
+            <img id="img-preview" class="hidden absolute inset-0 w-full h-full object-contain bg-black" />
+          </div>
+          <input id="q-img-input" type="file" accept="image/*" class="hidden" onchange="previewImage(event)" />
+        </div>
+
+        <!-- Dynamic Question Mode Sections -->
+        <div id="mcq-options-wrapper" class="space-y-4">
+          <div class="flex justify-between items-center">
+            <label id="options-label-text" class="text-xs tracking-wider text-gray-400 uppercase font-mono">Answer Options (Click ● to mark Correct Answer)</label>
+            <span class="text-xs font-mono text-gray-400"><span id="opt-count">2</span>/8 Options</span>
+          </div>
+          <div id="options-list" class="space-y-3">
+            <!-- Dynamic options generated via JS -->
+          </div>
+          <button id="add-opt-btn" onclick="addOptionField()" class="text-xs sm:text-sm text-green-400 hover:text-green-300 flex items-center gap-1 font-mono mt-1 p-1">
+            <span>+ Add option (2 - 8)</span>
+          </button>
+        </div>
+
+        <!-- Text Answer Input Container (🧩 Mode) -->
+        <div id="text-ans-wrapper" class="hidden space-y-2">
+          <label class="text-xs tracking-wider text-green-400 uppercase font-mono font-bold font-mono">Put Correct Answer</label>
+          <input id="text-correct-ans-input" type="text" placeholder="Type correct answer here (e.g. hi)..." class="w-full bg-black/60 border border-green-500 rounded-xl p-3 text-white focus:outline-none focus:ring-1 focus:ring-green-400 transition font-mono text-sm sm:text-base" />
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex flex-wrap justify-between items-center gap-4 pt-6 border-t border-white/10">
+          <span class="text-xs text-gray-400 font-mono">Total Questions Added: <strong id="total-q-count" class="text-white">0</strong></span>
+          
+          <div class="flex items-center gap-2 sm:gap-3">
+            <!-- Mode Toggle 1: 🎭 Poll Mode -->
+            <button id="btn-poll-mode" onclick="togglePollMode()" class="bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold p-2.5 sm:p-3 rounded-xl transition text-lg sm:text-xl flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12" title="Toggle Voting Poll Question">
+              🎭
+            </button>
+
+            <!-- Mode Toggle 2: 🧩 Text Answer Mode -->
+            <button id="btn-text-mode" onclick="toggleTextMode()" class="bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold p-2.5 sm:p-3 rounded-xl transition text-lg sm:text-xl flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12" title="Toggle Text Answer Question">
+              🧩
+            </button>
+
+            <!-- 1. Next Question button -->
+            <button onclick="saveAndNextQuestion()" class="bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold p-2.5 sm:p-3 px-4 sm:px-5 rounded-xl transition text-lg sm:text-xl flex items-center gap-2" title="Save Question & Add Next">
+              <span>≫</span>
+            </button>
+            
+            <!-- 2. Finish Quiz button -->
+            <button id="publish-btn" onclick="finishAndPublishQuiz()" class="bg-green-500 hover:bg-green-400 text-black font-black p-2.5 sm:p-3 px-4 sm:px-5 rounded-xl transition text-lg sm:text-xl flex items-center gap-2" title="Publish Quiz & Get 11-Digit Code">
+              <span>✅</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW 3: Quiz Code Result -->
+      <div id="view-code-result" class="hidden text-center space-y-6 py-6">
+        <div class="text-green-400 text-5xl">🎉</div>
+        <h2 class="text-xl sm:text-2xl font-bold">Quiz Created Successfully!</h2>
+        <p class="text-gray-400 text-sm">Share this 11-digit PIN code with friends to play:</p>
+        <div class="inline-block bg-black/80 border-2 border-green-500 text-green-400 font-mono text-xl sm:text-3xl font-black px-4 py-3 sm:px-6 sm:py-4 rounded-xl tracking-widest shadow-[0_0_20px_rgba(0,255,65,0.3)] select-all cursor-pointer" onclick="copyCodeToClipboard()">
+          <span id="generated-code">-----------</span>
+        </div>
+        <p id="copy-msg" class="text-xs text-gray-500 font-mono">Click PIN code to copy</p>
+        <div>
+          <button onclick="goHome()" class="bg-white text-black px-6 py-3 sm:px-8 sm:py-3 rounded-xl font-bold hover:bg-gray-200 transition text-sm sm:text-base">
+            Back to Home
+          </button>
+        </div>
+      </div>
+
+      <!-- VIEW 4: Take Quiz Player -->
+      <div id="view-play" class="hidden space-y-6">
+        <div class="flex justify-between items-center border-b border-white/10 pb-4">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-mono text-gray-400">QUESTION <span id="play-q-index">1</span> OF <span id="play-q-total">1</span></span>
+            <!-- Owner Leaderboard Icon (🥸) -->
+            <button id="owner-btn" onclick="openLeaderboard()" class="hidden bg-green-500/20 border border-green-500 hover:bg-green-500/40 text-white px-2 py-1 rounded-lg text-lg transition" title="View Responses (Owner Only)">
+              🥸
+            </button>
+          </div>
+          <button onclick="goHome()" class="text-xs text-red-400 hover:underline">Quit</button>
+        </div>
+
+        <!-- Question Display -->
+        <h3 id="play-q-text" class="text-lg sm:text-2xl font-bold text-white">---</h3>
+
+        <!-- Image Display -->
+        <div id="play-img-container" class="hidden w-full max-h-64 rounded-xl overflow-hidden bg-black flex justify-center">
+          <img id="play-q-img" src="" class="max-h-64 object-contain" />
+        </div>
+
+        <!-- Question Input Container -->
+        <div id="play-options-container" class="space-y-3 pt-2">
+          <!-- Dynamic Answer Options / Text Box -->
+        </div>
+
+        <!-- Correct answer reveal for Text Answer mode -->
+        <div id="text-reveal-box" class="hidden text-center p-4 rounded-xl font-bold font-mono bg-green-500/10 border border-green-500 text-green-400">
+          <div class="text-xs text-gray-400 uppercase mb-1">Correct Answer</div>
+          <div id="text-correct-reveal-val" class="text-lg sm:text-xl font-black">---</div>
+        </div>
+
+        <!-- Result Feedback Box -->
+        <div id="play-feedback" class="hidden text-center p-4 rounded-xl font-bold font-mono"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Firebase Modular Scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      if (toast && toastMsg) {
+        toastMsg.innerText = msg;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 3000);
+      }
+    }
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'quizes-48e98';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+      apiKey: "AIzaSyD25fXSbZ5FmvbmU8Kn7M82k5LOys566jU",
+      authDomain: "quizes-48e98.firebaseapp.com",
+      projectId: "quizes-48e98",
+      storageBucket: "quizes-48e98.firebasestorage.app",
+      messagingSenderId: "74301074044",
+      appId: "1:74301074044:web:4639d058aa181b41c577f9"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+
+    // --- AUTOMATIC SESSION SCANNER WITH SUB GATE ---
+    window.onload = function() {
+      setTimeout(() => {
+        let scannedGmail = localStorage.getItem('user_gmail');
+        if (scannedGmail) {
+          document.getElementById('sub-gate-container').classList.add('hidden');
+          document.getElementById('main-app').classList.remove('hidden');
+        } else {
+          showStep('step1');
+        }
+      }, 1500);
+    };
+
+    function showStep(id) {
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+    }
+
+    window.handleSubscribe = function() {
+      window.open('https://www.youtube.com/@Ultra-wk8ed', '_blank');
+      
+      const btn = document.getElementById('subBtn');
+      btn.innerHTML = "[ CHECKING... ]<span class='blink'>_</span>";
+      btn.classList.add('disabled');
+      
+      setTimeout(() => {
+        let autoGmail = `user_${Math.random().toString(36).substring(2, 9)}@gmail.com`;
+        if (currentUser && currentUser.email) {
+          autoGmail = currentUser.email;
+        }
+        localStorage.setItem('user_gmail', autoGmail);
+
+        document.getElementById('sub-gate-container').classList.add('hidden');
+        document.getElementById('main-app').classList.remove('hidden');
+      }, 2000);
+    };
+
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (e) {
+        console.warn("Auth init warning:", e);
+      }
+    };
+    initAuth();
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+        if (user.email && !localStorage.getItem('user_gmail')) {
+          localStorage.setItem('user_gmail', user.email);
+        }
+      }
+    });
+
+    let currentQuizQuestions = [];
+    let currentImageBase64 = null;
+    let selectedCorrectIdx = null;
+    let currentQMode = 'mcq';
+
+    window.localQuizzes = JSON.parse(localStorage.getItem('my_local_quizzes_db') || '{}');
+    window.localAttempts = JSON.parse(localStorage.getItem('my_local_attempts') || '{}');
+
+    let activeQuizData = null;
+    let activeQuizCode = null;
+    let activeQIndex = 0;
+    let score = 0;
+    let currentPlayerName = "";
+    let isOwner = false;
+    let playerQuestionResponses = [];
+
+    // --- 01100 Matrix Rain Effect ---
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    let cols = Math.floor(canvas.width / 18);
+    let drops = Array(cols).fill(1);
+    const chars = '01100';
+    
+    function drawMatrix() {
+      ctx.fillStyle = 'rgba(0,0,0,0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#00ff41';
+      ctx.font = '14px Share Tech Mono';
+      drops.forEach((y, i) => {
+        const ch = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(ch, i * 18, y * 18);
+        if (y * 18 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      });
+    }
+    setInterval(drawMatrix, 50);
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      cols = Math.floor(canvas.width / 18);
+      drops = Array(cols).fill(1);
+    });
+
+    function showView(viewId) {
+      ['view-dashboard', 'view-create', 'view-code-result', 'view-play'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(viewId).classList.remove('hidden');
+    }
+
+    window.goHome = function() {
+      showView('view-dashboard');
+      document.getElementById('dash-msg').innerText = '';
+      document.getElementById('search-code-input').value = '';
+    };
+
+    window.togglePollMode = function() {
+      currentQMode = currentQMode === 'poll' ? 'mcq' : 'poll';
+      updateModeButtonsUI();
+    };
+
+    window.toggleTextMode = function() {
+      currentQMode = currentQMode === 'text' ? 'mcq' : 'text';
+      updateModeButtonsUI();
+    };
+
+    function updateModeButtonsUI() {
+      const btnPoll = document.getElementById('btn-poll-mode');
+      const btnText = document.getElementById('btn-text-mode');
+      const mcqWrapper = document.getElementById('mcq-options-wrapper');
+      const textWrapper = document.getElementById('text-ans-wrapper');
+      const optLabel = document.getElementById('options-label-text');
+
+      btnPoll.classList.remove('btn-active-mode');
+      btnText.classList.remove('btn-active-mode');
+
+      if (currentQMode === 'poll') {
+        btnPoll.classList.add('btn-active-mode');
+        mcqWrapper.classList.remove('hidden');
+        textWrapper.classList.add('hidden');
+        optLabel.innerText = "Voting Poll Options (No correct answer required)";
+      } else if (currentQMode === 'text') {
+        btnText.classList.add('btn-active-mode');
+        mcqWrapper.classList.add('hidden');
+        textWrapper.classList.remove('hidden');
+      } else {
+        mcqWrapper.classList.remove('hidden');
+        textWrapper.classList.add('hidden');
+        optLabel.innerText = "Answer Options (Click ● to mark Correct Answer)";
+      }
+    }
+
+    function updateOptionCountUI() {
+      const container = document.getElementById('options-list');
+      const count = container.children.length;
+      document.getElementById('opt-count').innerText = count;
+      const addBtn = document.getElementById('add-opt-btn');
+      if (count >= 8) {
+        addBtn.classList.add('hidden');
+      } else {
+        addBtn.classList.remove('hidden');
+      }
+    }
+
+    function createOptionRow(index) {
+      const container = document.getElementById('options-list');
+      if (container.children.length >= 8) return;
+
+      const row = document.createElement('div');
+      row.className = "flex items-center gap-3 bg-black/40 border border-white/20 rounded-xl p-2 option-row transition";
+      
+      const isSelected = selectedCorrectIdx === index;
+
+      row.innerHTML = `
+        <button type="button" onclick="selectCorrectOption(${index})" class="opt-select-btn text-xl font-bold px-2 hover:scale-125 transition ${isSelected ? 'text-green-400 drop-shadow-[0_0_8px_#00ff41]' : 'text-gray-500'}" title="Mark as correct answer">
+          ●
+        </button>
+        <input type="text" class="opt-input w-full bg-transparent text-white focus:outline-none text-sm" placeholder="Option ${index + 1}" />
+        <button type="button" onclick="removeOptionField(this)" class="opt-remove-btn text-xs text-red-500 hover:text-red-400 font-mono px-2 ${container.children.length < 2 ? 'hidden' : ''}">✕</button>
+      `;
+      container.appendChild(row);
+      updateOptionCountUI();
+      refreshRemoveButtons();
+    }
+
+    function refreshRemoveButtons() {
+      const container = document.getElementById('options-list');
+      const rows = container.children;
+      Array.from(rows).forEach((row, i) => {
+        const removeBtn = row.querySelector('.opt-remove-btn');
+        if (removeBtn) {
+          if (rows.length <= 2) {
+            removeBtn.classList.add('hidden');
+          } else {
+            removeBtn.classList.remove('hidden');
+          }
+        }
+        const input = row.querySelector('.opt-input');
+        if (input) input.placeholder = `Option ${i + 1}`;
+        const selectBtn = row.querySelector('.opt-select-btn');
+        if (selectBtn) selectBtn.setAttribute('onclick', `selectCorrectOption(${i})`);
+      });
+
+      if (selectedCorrectIdx !== null) {
+        window.selectCorrectOption(selectedCorrectIdx);
+      }
+    }
+
+    window.addOptionField = function() {
+      const container = document.getElementById('options-list');
+      if (container.children.length < 8) {
+        createOptionRow(container.children.length);
+      }
+    };
+
+    window.removeOptionField = function(btn) {
+      const container = document.getElementById('options-list');
+      if (container.children.length > 2) {
+        const row = btn.closest('.option-row');
+        const rowIndex = Array.from(container.children).indexOf(row);
+        if (selectedCorrectIdx === rowIndex) {
+          selectedCorrectIdx = null;
+        } else if (selectedCorrectIdx > rowIndex) {
+          selectedCorrectIdx--;
+        }
+        row.remove();
+        refreshRemoveButtons();
+        updateOptionCountUI();
+      }
+    };
+
+    window.selectCorrectOption = function(idx) {
+      if (currentQMode === 'poll') return;
+
+      selectedCorrectIdx = idx;
+      const container = document.getElementById('options-list');
+      Array.from(container.children).forEach((child, i) => {
+        const btn = child.querySelector('.opt-select-btn');
+        if (i === idx) {
+          btn.classList.remove('text-gray-500');
+          btn.classList.add('text-green-400', 'drop-shadow-[0_0_8px_#00ff41]');
+          child.classList.add('border-green-500/50');
+        } else {
+          btn.classList.remove('text-green-400', 'drop-shadow-[0_0_8px_#00ff41]');
+          btn.classList.add('text-gray-500');
+          child.classList.remove('border-green-500/50');
+        }
+      });
+    };
+
+    window.showCreator = function() {
+      currentQuizQuestions = [];
+      currentQMode = 'mcq';
+      resetQuestionForm();
+      document.getElementById('q-num-display').innerText = '1';
+      document.getElementById('total-q-count').innerText = '0';
+      showView('view-create');
+    };
+
+    function resetQuestionForm() {
+      document.getElementById('q-text-input').value = '';
+      
+      const fileInput = document.getElementById('q-img-input');
+      if (fileInput) fileInput.value = '';
+
+      const previewImg = document.getElementById('img-preview');
+      if (previewImg) {
+        previewImg.removeAttribute('src');
+        previewImg.classList.add('hidden');
+      }
+
+      document.getElementById('img-plus-icon')?.classList.remove('hidden');
+      document.getElementById('img-hint-text')?.classList.remove('hidden');
+      document.getElementById('text-correct-ans-input').value = '';
+      
+      currentImageBase64 = null;
+      selectedCorrectIdx = null;
+      currentQMode = 'mcq';
+      updateModeButtonsUI();
+      
+      const container = document.getElementById('options-list');
+      container.innerHTML = '';
+      for (let i = 0; i < 2; i++) {
+        createOptionRow(i);
+      }
+    }
+
+    window.previewImage = function(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          currentImageBase64 = e.target.result;
+          const imgPreview = document.getElementById('img-preview');
+          imgPreview.src = currentImageBase64;
+          imgPreview.classList.remove('hidden');
+          document.getElementById('img-plus-icon').classList.add('hidden');
+          document.getElementById('img-hint-text').classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    function validateCurrentQuestion() {
+      const text = document.getElementById('q-text-input').value.trim();
+      if (!text) return null;
+
+      if (currentQMode === 'text') {
+        const correctText = document.getElementById('text-correct-ans-input').value.trim();
+        if (!correctText) return null;
+        return {
+          type: 'text',
+          question: text,
+          image: currentImageBase64,
+          correctText: correctText
+        };
+      }
+
+      const optInputs = document.querySelectorAll('.opt-input');
+      const validOptions = [];
+      let mappedCorrectIdx = null;
+
+      optInputs.forEach((input, originalIdx) => {
+        const val = input.value.trim();
+        if (val !== '') {
+          validOptions.push(val);
+          if (originalIdx === selectedCorrectIdx) {
+            mappedCorrectIdx = validOptions.length - 1;
+          }
+        }
+      });
+
+      if (validOptions.length < 2) return null;
+
+      if (currentQMode === 'mcq' && mappedCorrectIdx === null) return null;
+
+      return {
+        type: currentQMode,
+        question: text,
+        image: currentImageBase64,
+        options: validOptions,
+        correctIndex: currentQMode === 'mcq' ? mappedCorrectIdx : null
+      };
+    }
+
+    window.saveAndNextQuestion = function() {
+      const qData = validateCurrentQuestion();
+      if (!qData) {
+        showToast("Please fill in question, 2 options, and mark correct answer!");
+        return;
+      }
+
+      currentQuizQuestions.push(qData);
+      resetQuestionForm();
+      
+      document.getElementById('q-num-display').innerText = currentQuizQuestions.length + 1;
+      document.getElementById('total-q-count').innerText = currentQuizQuestions.length;
+      showToast("Question saved! Add next one ≫");
+    };
+
+    function generateFast11DigitNumberCode() {
+      let code = '';
+      for (let i = 0; i < 11; i++) {
+        if (i === 0) {
+          code += Math.floor(Math.random() * 9 + 1).toString();
+        } else {
+          code += Math.floor(Math.random() * 10).toString();
+        }
+      }
+      return code;
+    }
+
+    function markCodeAsCreated(code) {
+      try {
+        const created = JSON.parse(localStorage.getItem('my_created_quizzes') || '[]');
+        if (!created.includes(code)) {
+          created.push(code);
+          localStorage.setItem('my_created_quizzes', JSON.stringify(created));
+        }
+      } catch (e) {
+        console.warn("LocalStorage error:", e);
+      }
+    }
+
+    /* --- SAFE & FIXED ✅ PUBLISH HANDLER --- */
+    window.finishAndPublishQuiz = async function() {
+      const qTextInput = document.getElementById('q-text-input').value.trim();
+      
+      // If the current screen has text typed in, validate and include it
+      if (qTextInput !== '') {
+        const qData = validateCurrentQuestion();
+        if (qData) {
+          currentQuizQuestions.push(qData);
+        } else {
+          showToast("Complete all fields or click ≫ first!");
+          return;
+        }
+      }
+
+      // Ensure at least 1 question is saved before generating code
+      if (currentQuizQuestions.length === 0) {
+        showToast("Add at least 1 question first! Fill out inputs & click ≫");
+        return;
+      }
+
+      const quizCode = generateFast11DigitNumberCode();
+
+      const quizPayload = {
+        code: quizCode,
+        ownerUid: currentUser ? currentUser.uid : 'anonymous',
+        ownerEmail: localStorage.getItem('user_gmail') || 'anonymous',
+        questions: [...currentQuizQuestions],
+        createdAt: new Date().toISOString()
+      };
+
+      // Save locally
+      window.localQuizzes[quizCode] = quizPayload;
+      localStorage.setItem('my_local_quizzes_db', JSON.stringify(window.localQuizzes));
+      markCodeAsCreated(quizCode);
+
+      // Render 11-digit PIN code on screen
+      document.getElementById('generated-code').innerText = quizCode;
+      showView('view-code-result');
+      
+      currentQuizQuestions = [];
+      resetQuestionForm();
+
+      // Sync Firestore
+      try {
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'quizzes', quizCode), quizPayload);
+      } catch (e) {
+        console.warn("Firestore sync error:", e);
+      }
+    };
+
+    window.copyCodeToClipboard = function() {
+      const code = document.getElementById('generated-code').innerText;
+      if (code && code !== '-----------') {
+        const el = document.createElement('textarea');
+        el.value = code;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        document.getElementById('copy-msg').innerText = "Copied to clipboard! ✅";
+        setTimeout(() => {
+          document.getElementById('copy-msg').innerText = "Click PIN code to copy";
+        }, 2000);
+      }
+    };
+
+    window.searchQuiz = async function() {
+      const codeInput = document.getElementById('search-code-input').value.trim();
+      const msgBox = document.getElementById('dash-msg');
+
+      if (!codeInput || codeInput.length !== 11 || isNaN(codeInput)) {
+        msgBox.innerText = "Please enter a valid 11-digit numeric PIN code!";
+        msgBox.className = "text-center text-sm font-mono text-red-400";
+        return;
+      }
+
+      msgBox.innerText = "Searching quiz...";
+      msgBox.className = "text-center text-sm font-mono text-gray-400";
+
+      let quizData = window.localQuizzes[codeInput] || null;
+
+      if (!quizData) {
+        try {
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'quizzes', codeInput);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            quizData = docSnap.data();
+            window.localQuizzes[codeInput] = quizData;
+            localStorage.setItem('my_local_quizzes_db', JSON.stringify(window.localQuizzes));
+          }
+        } catch (e) {
+          console.error("Search error:", e);
+        }
+      }
+
+      if (!quizData || !quizData.questions || quizData.questions.length === 0) {
+        msgBox.innerText = "No Quiz Found! Check 11-digit PIN code and try again.";
+        msgBox.className = "text-center text-sm font-mono text-red-400";
+        return;
+      }
+
+      activeQuizData = quizData;
+      activeQuizCode = codeInput;
+
+      const myCreated = JSON.parse(localStorage.getItem('my_created_quizzes') || '[]');
+      const userEmail = localStorage.getItem('user_gmail');
+      isOwner = myCreated.includes(codeInput) || 
+                (currentUser && quizData.ownerUid === currentUser.uid) || 
+                (userEmail && quizData.ownerEmail && quizData.ownerEmail === userEmail);
+
+      if (isOwner) {
+        currentPlayerName = "Owner 🥸";
+        startQuizPlayer();
+      } else {
+        document.getElementById('player-name-input').value = '';
+        document.getElementById('name-modal').classList.remove('hidden');
+      }
+    };
+
+    window.confirmPlayerName = function() {
+      const name = document.getElementById('player-name-input').value.trim();
+      
+      if (name.length < 2 || name.length > 10) {
+        showToast("Name must be between 2 and 10 characters!");
+        return;
+      }
+
+      currentPlayerName = name;
+      document.getElementById('name-modal').classList.add('hidden');
+      startQuizPlayer();
+    };
+
+    function startQuizPlayer() {
+      activeQIndex = 0;
+      score = 0;
+      playerQuestionResponses = [];
+      showView('view-play');
+
+      const ownerBtn = document.getElementById('owner-btn');
+      if (isOwner) {
+        ownerBtn.classList.remove('hidden');
+      } else {
+        ownerBtn.classList.add('hidden');
+      }
+
+      renderQuestionInPlayer();
+    }
+
+    function renderQuestionInPlayer() {
+      if (!activeQuizData || !activeQuizData.questions || activeQuizData.questions.length === 0) return;
+
+      const q = activeQuizData.questions[activeQIndex];
+      document.getElementById('play-q-index').innerText = activeQIndex + 1;
+      document.getElementById('play-q-total').innerText = activeQuizData.questions.length;
+      document.getElementById('play-q-text').innerText = q.question;
+
+      const imgContainer = document.getElementById('play-img-container');
+      const imgEl = document.getElementById('play-q-img');
+      if (q.image) {
+        imgEl.src = q.image;
+        imgContainer.classList.remove('hidden');
+      } else {
+        imgContainer.classList.add('hidden');
+      }
+
+      document.getElementById('play-feedback').classList.add('hidden');
+      document.getElementById('text-reveal-box').classList.add('hidden');
+
+      const optionsBox = document.getElementById('play-options-container');
+      optionsBox.innerHTML = '';
+
+      if (q.type === 'text') {
+        optionsBox.innerHTML = `
+          <div class="space-y-3">
+            <input id="player-text-input" type="text" placeholder="Type your answer here..." class="w-full bg-black/60 border border-white/30 rounded-xl p-3 sm:p-4 text-white font-mono focus:outline-none focus:border-green-400 text-sm sm:text-base" />
+            <button id="submit-text-ans-btn" onclick="handleTextAnswerSubmission()" class="w-full bg-green-500 text-black font-bold py-3 sm:py-4 rounded-xl hover:bg-green-400 transition font-mono uppercase text-sm sm:text-base">
+              Submit Answer
+            </button>
+          </div>
+        `;
+      } else {
+        q.options.forEach((optText, idx) => {
+          const btn = document.createElement('button');
+          btn.className = "w-full text-left bg-black/60 border border-white/20 hover:border-white/60 p-3 sm:p-4 rounded-xl text-white font-medium transition flex items-center justify-between text-sm sm:text-base";
+          btn.innerHTML = `<span>${optText}</span><span class="text-xs opacity-40 font-mono">Option ${String.fromCharCode(65 + idx)}</span>`;
+          btn.onclick = () => handleAnswerSubmission(idx, btn);
+          optionsBox.appendChild(btn);
+        });
+      }
+    }
+
+    window.handleTextAnswerSubmission = function() {
+      const inputEl = document.getElementById('player-text-input');
+      const submitBtn = document.getElementById('submit-text-ans-btn');
+      const userAns = inputEl.value.trim();
+
+      if (!userAns) {
+        showToast("Please enter an answer!");
+        return;
+      }
+
+      inputEl.disabled = true;
+      submitBtn.disabled = true;
+
+      const q = activeQuizData.questions[activeQIndex];
+      const correctAns = q.correctText || '';
+      
+      const isCorrect = userAns.toLowerCase() === correctAns.toLowerCase();
+
+      playerQuestionResponses.push({
+        qIndex: activeQIndex,
+        type: 'text',
+        userAns: userAns,
+        correctAns: correctAns,
+        isCorrect: isCorrect
+      });
+
+      const feedback = document.getElementById('play-feedback');
+      feedback.classList.remove('hidden');
+
+      if (isCorrect) {
+        score++;
+        feedback.innerText = "✨ CORRECT ANSWER!";
+        feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-green-500/20 border border-green-500 text-green-400";
+      } else {
+        feedback.innerText = "❌ WRONG ANSWER!";
+        feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-red-500/20 border border-red-500 text-red-200";
+
+        const textReveal = document.getElementById('text-reveal-box');
+        document.getElementById('text-correct-reveal-val').innerText = correctAns;
+        textReveal.classList.remove('hidden');
+      }
+
+      setTimeout(() => {
+        advanceQuestion();
+      }, 2000);
+    };
+
+    function handleAnswerSubmission(selectedIdx, btnElement) {
+      const q = activeQuizData.questions[activeQIndex];
+      const allBtns = document.querySelectorAll('#play-options-container button');
+      
+      allBtns.forEach(b => b.disabled = true);
+
+      const feedback = document.getElementById('play-feedback');
+      feedback.classList.remove('hidden');
+
+      if (q.type === 'poll') {
+        playerQuestionResponses.push({
+          qIndex: activeQIndex,
+          type: 'poll',
+          selectedOption: q.options[selectedIdx],
+          selectedIdx: selectedIdx
+        });
+
+        btnElement.classList.add('correct-anim');
+        feedback.innerText = "🗳️ VOTE RECORDED!";
+        feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-green-500/20 border border-green-500 text-green-400";
+      } else {
+        const isCorrect = selectedIdx === q.correctIndex;
+        playerQuestionResponses.push({
+          qIndex: activeQIndex,
+          type: 'mcq',
+          selectedOption: q.options[selectedIdx],
+          correctOption: q.options[q.correctIndex],
+          selectedIdx: selectedIdx,
+          correctIdx: q.correctIndex,
+          isCorrect: isCorrect
+        });
+
+        if (isCorrect) {
+          score++;
+          btnElement.classList.add('correct-anim');
+          feedback.innerText = "✨ CORRECT ANSWER!";
+          feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-green-500/20 border border-green-500 text-green-400";
+        } else {
+          btnElement.classList.add('wrong-anim');
+          if (allBtns[q.correctIndex]) {
+            allBtns[q.correctIndex].classList.add('correct-anim');
+          }
+          feedback.innerText = "❌ WRONG ANSWER!";
+          feedback.className = "text-center p-4 rounded-xl font-bold font-mono bg-red-500/20 border border-red-500 text-red-200";
+        }
+      }
+
+      setTimeout(() => {
+        advanceQuestion();
+      }, 1500);
+    }
+
+    function advanceQuestion() {
+      activeQIndex++;
+      if (activeQIndex < activeQuizData.questions.length) {
+        renderQuestionInPlayer();
+      } else {
+        finishQuizAndSaveAttempt();
+      }
+    }
+
+    async function finishQuizAndSaveAttempt() {
+      const gradedQuestions = activeQuizData.questions.filter(q => q.type !== 'poll');
+      const totalGraded = gradedQuestions.length;
+
+      showQuizSummary(totalGraded);
+
+      const attemptData = {
+        quizCode: activeQuizCode,
+        userName: currentPlayerName,
+        score: score,
+        totalQuestions: totalGraded,
+        responses: playerQuestionResponses,
+        timestamp: new Date().toISOString()
+      };
+
+      if (!window.localAttempts[activeQuizCode]) {
+        window.localAttempts[activeQuizCode] = [];
+      }
+      window.localAttempts[activeQuizCode].push(attemptData);
+      localStorage.setItem('my_local_attempts', JSON.stringify(window.localAttempts));
+
+      try {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'attempts'), attemptData);
+      } catch (e) {
+        console.warn("Failed saving attempt cloud:", e);
+      }
+    }
+
+    function showQuizSummary(totalGraded) {
+      const percentage = totalGraded > 0 ? Math.round((score / totalGraded) * 100) : 100;
+
+      const optionsBox = document.getElementById('play-options-container');
+      document.getElementById('play-q-text').innerText = "Quiz Completed! 🏆";
+      document.getElementById('play-img-container').classList.add('hidden');
+      document.getElementById('text-reveal-box').classList.add('hidden');
+
+      optionsBox.innerHTML = `
+        <div class="text-center space-y-4 py-6">
+          <div class="text-4xl sm:text-5xl font-black font-mono text-green-400">${score} / ${totalGraded}</div>
+          <div class="text-lg sm:text-xl font-bold">Accuracy: ${percentage}%</div>
+          <button onclick="goHome()" class="bg-white text-black px-6 py-3 sm:px-8 sm:py-3 rounded-xl font-bold hover:bg-gray-200 transition mt-4 text-sm sm:text-base">
+            Back to Home
+          </button>
+        </div>
+      `;
+      document.getElementById('play-feedback').classList.add('hidden');
+    }
+
+    window.openLeaderboard = async function() {
+      const modal = document.getElementById('leaderboard-modal');
+      const content = document.getElementById('leaderboard-content');
+      modal.classList.remove('hidden');
+      content.innerHTML = '<div class="text-center py-8 text-gray-400">Loading attempts...</div>';
+
+      let attempts = [...(window.localAttempts[activeQuizCode] || [])];
+
+      try {
+        const fetchPromise = getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'attempts'));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout'), 2500));
+
+        const querySnap = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        querySnap.forEach(d => {
+          const data = d.data();
+          if (data.quizCode === activeQuizCode) {
+            if (!attempts.some(a => a.timestamp === data.timestamp && a.userName === data.userName)) {
+              attempts.push(data);
+            }
+          }
+        });
+      } catch (e) {
+        console.warn("Leaderboard cloud fetch fallback:", e);
+      }
+
+      attempts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      if (attempts.length === 0) {
+        content.innerHTML = '<div class="text-center py-8 text-gray-400">No responses recorded yet!</div>';
+        return;
+      }
+
+      let html = '';
+      attempts.forEach(att => {
+        html += `
+          <div class="bg-black/60 border border-white/20 rounded-xl p-4 space-y-2">
+            <div class="flex justify-between items-center text-green-400 font-bold border-b border-white/10 pb-2">
+              <span>Name: ${att.userName}</span>
+              <span>Score: ${att.score} out of ${att.totalQuestions}</span>
+            </div>
+            <div class="space-y-1 text-xs text-gray-300 pt-1">
+        `;
+
+        if (att.responses && att.responses.length > 0) {
+          att.responses.forEach((resp, i) => {
+            if (resp.type === 'poll') {
+              html += `<div>Q${i+1} (Poll): Chose <strong>'${resp.selectedOption || 'N/A'}'</strong></div>`;
+            } else if (resp.type === 'text') {
+              if (resp.isCorrect) {
+                html += `<div class="text-green-400">Q${i+1}: put '${resp.userAns}' (Correct)</div>`;
+              } else {
+                html += `<div class="text-red-400">Q${i+1}: put '${resp.userAns}' instead of '${resp.correctAns}'</div>`;
+              }
+            } else {
+              if (resp.isCorrect) {
+                html += `<div class="text-green-400">Q${i+1}: Selected Option ${String.fromCharCode(65 + resp.selectedIdx)} (Correct)</div>`;
+              } else {
+                html += `<div class="text-red-400">Q${i+1}: put Option ${String.fromCharCode(65 + resp.selectedIdx)} instead of Option ${String.fromCharCode(65 + resp.correctIdx)}</div>`;
+              }
+            }
+          });
+        }
+
+        html += `
+            </div>
+          </div>
+        `;
+      });
+
+      content.innerHTML = html;
+    };
+
+    window.closeLeaderboard = function() {
+      document.getElementById('leaderboard-modal').classList.add('hidden');
+    };
+  </script>
+</body>
+</html>
